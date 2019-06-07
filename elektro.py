@@ -2,7 +2,6 @@ import numpy as np
 from scipy import optimize
 from matplotlib import pyplot as plt
 import matplotlib
-matplotlib.use('Qt5Agg')
 
 # :,0 coz these CSV have endline chars
 CH1ARR = [np.genfromtxt(f'A000{i}CH1.CSV', delimiter = ',', skip_header=25)[:,0] for i in range(0, 9)]
@@ -90,7 +89,7 @@ def approx_plot_0_5(y):
     n = np.transpose(n)
     x = n * 4e-6
     y = y[POCZATEK_STANU_NIEUSTALONEGO:POCZATEK_STANU_NIEUSTALONEGO + ILOSC_PROBEK_WYKRESU]
-    plt.plot(x, y, label='Dane z oscyloskopu')
+    plt.plot(x * 1000, y, label='Dane z oscyloskopu')
     print(x[0], y[0])
     dg = dg_factory(x[:DLUGOSC_APROKSYMACJI], y[:DLUGOSC_APROKSYMACJI])
     Aa = optimize.fmin(dg, (1, 1e-3), maxfun=10000)
@@ -100,21 +99,59 @@ def approx_plot_0_5(y):
     der = derivative(Aa, x[POZYCJA_STYCZNEJ])
     tangent = tangent_factory(der, x[POZYCJA_STYCZNEJ], approx_y[POZYCJA_STYCZNEJ])
     tangent_y = np.array([tangent(i) for i in x])
-    print(f'Aproksymacja: A*e^(-a*x) + b\ny = {Aa[0]} * e^({-Aa[1]} * x) + {y[X_STANU_USTALONEGO]}')
-    print(f"Styczna: y - y0 = f'(x)(x - x0)\ny = {der} * (x - {x[POZYCJA_STYCZNEJ]} + {y[POZYCJA_STYCZNEJ]})") 
-    plt.plot(x, approx_y, label =f'Aproksymacja: A*exp(-a*x) + b\n{Aa[0]:.1f} * e^({-Aa[1]:.1f} * x) + {y[X_STANU_USTALONEGO]}')
-    plt.plot(x, tangent_y, label =f"Styczna: y = f'(x)(x - x0) + y0\ny = {der:.1f} * (x - {x[POZYCJA_STYCZNEJ]:.5f}) + {y[POZYCJA_STYCZNEJ]}")
-    tau_last_x = np.where(tangent_y >= y[X_STANU_USTALONEGO])[0][0]
+    print(f'Aproksymacja:  A*exp^(-a*x) + b\ny = {Aa[0]} * e^({-Aa[1]} * x) + {y[X_STANU_USTALONEGO]}')
+    print(f"Styczna:  y - y0 = f'(x)(x - x0)\ny = {der} * (x - {x[POZYCJA_STYCZNEJ]} + {y[POZYCJA_STYCZNEJ]})") 
+    print(f'x0 = {x[POZYCJA_STYCZNEJ]}')
+    print(f'y0 = {approx_y[POZYCJA_STYCZNEJ]}')
+    plt.plot(x * 1000, approx_y, label =f'Aproksymacja:  ' + r'$ A*e^{-a*x} + b$')# + '\n' + r'${Aa[0]:.1f} * e^({-Aa[1]:.1f} * x) + {y[X_STANU_USTALONEGO]}$')
+    plt.plot(x * 1000, tangent_y, label =f"Styczna:  " + r"$y = f'(x)(x - x_0) + y_0$") #\ny = {der:.1f} * (x - {x[POZYCJA_STYCZNEJ]:.5f}) + {y[POZYCJA_STYCZNEJ]}")
+    tau_last_x=np.where(tangent_y >= y[X_STANU_USTALONEGO])[0][0]
     if not tau_last_x:
         tau_last_x=np.where(tangent_y <= y[X_STANU_USTALONEGO])[0][0]
     tau_x = np.array([i for i in x[POZYCJA_STYCZNEJ:tau_last_x - 1]])
-    plt.plot(tau_x, [y[X_STANU_USTALONEGO] for _ in range(0, tau_last_x - POZYCJA_STYCZNEJ - 1)],
-            label=f'tau(graficznie)= {x[tau_last_x - 1] - x[POZYCJA_STYCZNEJ]:.6f}\ntau(1/a) = {1 / Aa[1]:.6f}',
+    taugraph = (y[X_STANU_USTALONEGO] - (-der * x[POZYCJA_STYCZNEJ] + approx_y[POZYCJA_STYCZNEJ])) / der - x[POZYCJA_STYCZNEJ]
+    plt.plot(tau_x * 1000, [y[X_STANU_USTALONEGO] for _ in range(0, tau_last_x - POZYCJA_STYCZNEJ - 1)],
+            label=f'tau(graficznie)= {taugraph:.6f}\ntau(1/a) = {1 / Aa[1]:.6f}',
             dashes=[6, 2])
     plt.ylabel('Napiecie [V]')
-    plt.xlabel('Czas [s]')
+    plt.xlabel('Czas [ms]')
     plt.legend()
+    plt.grid(True)
+    print(
+'\
+[$]A = %.2f\n[/$]<br>\
+[$]a = %.2f\n[/$]<br>\
+[$]b = %.1f\n[/$]<br>\
+[$]f^\\prime\\left(x\\right)=A\\cdot e^{-ax}\\cdot-b\n[/$]<br>\
+[$]x_0 = %.4f \n[/$]<br>\
+[$]y_0=%.2f\\cdot e^{-\\left(%.2f\\right)\\cdot%.2f}+%.1f=%.2f\n[/$]<br>\
+[$]f^\\prime\\left(%.4f\\right)=%.2f\\cdot e^{-\\left(%.2f\\right)\\cdot%.4f}\\cdot-\\left(%.2f\\right)=%.2f\n[/$]<br>\
+funkcja stycznej: [$]y\\ =\\ %.2fx\\ +\\ %.2f\n[/$]<br>\
+x dla stycznej dla wartosci [$]y = %.1f\n[/$]<br>\
+[$]%.1f\\ =\\ %.2fx\\ +\\ %.2f\n[/$]<br>\
+[$]x\\ =\\ %.4f\n[/$]<br>\
+[$]tau = x - x_0 = %.6f\n[/$]<br>\
+[$]tau2 = 1 / a = %.6f\n[/$]<br>\
+'
+        %
+        (
+        Aa[0],
+        Aa[1], 
+        y[X_STANU_USTALONEGO],
+        x[POZYCJA_STYCZNEJ],
+        Aa[0], Aa[1], x[POZYCJA_STYCZNEJ], y[X_STANU_USTALONEGO] ,approx_y[POZYCJA_STYCZNEJ],
+        x[POZYCJA_STYCZNEJ], Aa[0], Aa[1], x[POZYCJA_STYCZNEJ], Aa[1], der,
+        der, -der * x[POZYCJA_STYCZNEJ] + approx_y[POZYCJA_STYCZNEJ],
+        y[X_STANU_USTALONEGO],
+        y[X_STANU_USTALONEGO], der, -der * x[POZYCJA_STYCZNEJ] + approx_y[POZYCJA_STYCZNEJ],
+        (y[X_STANU_USTALONEGO] - (-der * x[POZYCJA_STYCZNEJ] + approx_y[POZYCJA_STYCZNEJ])) / der,
+        taugraph,
+        1 / Aa[1]
+        )
+        )
+
     plt.show()
+
 
 
 def approx_plot_6_7(y):
@@ -130,7 +167,7 @@ def approx_plot_6_7(y):
     gapprox = g_factory_osci(y[X_STANU_USTALONEGO])
     approx_y = np.array([gapprox(Aaw[0],Aaw[1],Aaw[2], i) for i in x])
     print(f'Aproksymacja: A*e^(-a*x) * sin(w*x) + b\ny = {Aaw[0]} * e^({-Aaw[1]} * x) * cos({Aaw[2]}*x) + {y[X_STANU_USTALONEGO]}')
-    plt.plot(x, approx_y, label =f'Aproksymacja: A*exp(-a*x) * sin(w*x) + b\n    y = {Aaw[0]:.1f} * e^({-Aaw[1]:.1f} * x) * cos({Aaw[2]:.1f}*x) + {y[X_STANU_USTALONEGO]}')
+    plt.plot(x, approx_y, label =f'Aproksymacja: ' + r'$A*e^{-a*x} * sin(w*x) + b$')# + '\n' + r'$y = {Aaw[0]:.1f} * e^({-Aaw[1]:.1f} * x) * cos({Aaw[2]:.1f}*x) + {y[X_STANU_USTALONEGO]}$')
     
     prev = approx_y[0]
     j = 0
@@ -159,18 +196,39 @@ def approx_plot_6_7(y):
             prev = approx_y[i]
     max_loc2 = prev
     max_loc2_x = j
-    frequency = 1/(x[max_loc2_x] - x[max_loc1_x])
-    dekrement = 2 * np.pi * Aaw[1] /np.sqrt(Aaw[2]**2 - Aaw[1]**2)
+    frequency_graph = 1/(x[max_loc2_x] - x[max_loc1_x])
+    frequency = Aaw[2] / (2 * np.pi)
+    T = 1/ frequency
+    dekrement_graph = frequency * np.log(max_loc1/max_loc2)
+    print('dekrement', dekrement_graph)
     plt.plot([x[max_loc1_x], x[max_loc1_x]], [y[X_STANU_USTALONEGO], max_loc1],'C3', dashes=[4, 2])
     plt.plot([x[max_loc2_x], x[max_loc2_x]], [y[X_STANU_USTALONEGO], max_loc2],'C3', dashes=[4, 2],
-            label=f'Logaritmiczny dekrement tlumienia = ln(An/An+1) = {np.log(max_loc1/max_loc2):.1f}\n' +
-            f'Logaritmiczny dekrement tlumienia = 2*pi*a/sqrt(w^2 - a^2) = {dekrement:.3f}')
+            label=f'Logaritmiczny dekrement tlumienia = {Aaw[1]:.2f}')# = {:.1f}\n' +
+#            f'Logaritmiczny dekrement tlumienia = 2*pi*a/sqrt(w^2 - a^2) = {dekrement:.3f}')
     plt.plot([x[max_loc1_x], x[max_loc2_x]], [max_loc1, max_loc1], dashes = [4,2],
             label=f'Czestotliwosc = {frequency:.1f} Hz')
     plt.ylabel('Napiecie [V]')
     plt.xlabel('Czas[s]')
-    plt.title(f'a = {Aaw[1]:.1f}, w = {Aaw[2]:.1f}')
+    plt.title(f'A = {Aaw[0]:.1f}, a = {Aaw[1]:.1f}, w = {Aaw[2]:.1f}')
     plt.legend()
+    print(
+'\
+[$]A = %.2f\n[/$]<br>\
+[$]a = %.2f\n[/$]<br>\
+[$]b = %.1f\n[/$]<br>\
+[$]\\phi =\\fraq{1}{T}\\ln{\\frac{A_n}{A_{n + 1}}}= %.2f\n[/$]<br>\
+[$]Czestotliwosc x_1 - x_2 = %.1f \n[/$]<br>\
+'
+        %
+        (
+        Aaw[0],
+        Aaw[1], 
+        y[X_STANU_USTALONEGO],
+        dekrement_graph,
+        frequency_graph,
+        )
+        )
+
     plt.show()
 
 
